@@ -9,3 +9,11 @@ It will read either its own `.ship.yml` config file or `.travis.yml`.
 Ease of migration from Travis is a goal but 100% compatibility is currently
 not.
 
+Running inside docker:
+
+docker run -i -e "REPO_URL=https://github.com/my/repo" shipbuilder
+
+Running outside of docker:
+
+REPO_URL="https://github.com/my/repo" python3 ./main.py
+
