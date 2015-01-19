@@ -16,4 +16,8 @@ repo_dir = repo.sync()
 config = executor.parse_shipconfig(executor.find_config(repo_dir))
 
 os.chdir(repo_dir)
-executor.run(config)
+
+success = executor.run(config)
+
+if not success:
+    exit(1)
