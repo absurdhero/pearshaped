@@ -45,11 +45,12 @@ def execute_step(config, name):
         else:
             commands = config[name]
 
-        for cmd in commands:
-            returncode = subprocess.call(cmd, shell=True, env=env)
-            if returncode != 0:
-                print("failed during '%s' step on command: %s" % (name, cmd))
-                return False
+        returncode = subprocess.call(
+            ['/bin/bash', '-x', '-e', '-c', '; '.join(commands)],
+            env=env)
+        if returncode != 0:
+            print("failed during '%s' step" % name)
+            return False
 
     return True
 
