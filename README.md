@@ -11,9 +11,22 @@ not.
 
 Running inside docker:
 
-docker run -i -e "REPO_URL=https://github.com/my/repo" shipbuilder
+    REPO_URL=https://github.com/my/repo" ./run.sh
 
 Running outside of docker:
 
-REPO_URL="https://github.com/my/repo" python3 ./main.py
+    REPO_URL="https://github.com/my/repo" python3 ./main.py
+
+
+Building the base docker image and each language image:
+
+    ./build_images.sh
+
+Build a single language image:
+
+    ./build_images.sh language/python
+
+Build the base image:
+
+    ./build_images.sh base
 
