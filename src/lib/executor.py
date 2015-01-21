@@ -102,10 +102,19 @@ class Executor():
 
     def _toolchain_container(self):
         if 'language' in self.config:
-            return 'shipbuilder-language-' + self.config['language']
+            language = self.config['language']
+            label = 'shipbuilder-language-' + language
+
+            images_output = subprocess.check_output('docker images -q %s' % label,
+                    shell=True,
+                    universal_newlines=True)
+
+            if len(images_output) > 0:
+                return label
+            else:
+                print("warning: language %s not found. using base image" % language)
 
         return "shipbuilder-base"
-
 
     EXTRA_ENV = {
         'CI': 'true',
