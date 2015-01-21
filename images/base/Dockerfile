@@ -11,3 +11,5 @@ RUN pip3 install pyYAML
 RUN apt-get install -qy scons cmake curl wget rsync openssl xvfb
 
 RUN apt-get clean
+
+ADD travis_retry /bin/
