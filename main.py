@@ -15,7 +15,7 @@ repo_dir = repo.sync()
 
 config = configure.parse(configure.find(repo_dir))
 
-exec = executor.Executor(repo_dir, config)
+exec = executor.Executor(os.getenv("REPO_DIR"), repo_dir, config)
 success = exec.run()
 
 if not success:

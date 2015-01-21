@@ -7,7 +7,8 @@ class Executor():
     # uniquely identifies each built image during this session
     global_id = 1
 
-    def __init__(self, repo_dir, config):
+    def __init__(self, host_repo_path, repo_dir, config):
+        self.host_repo_path = host_repo_path
         self.repo_dir = repo_dir
         self.config = config
         self.build_id = self.global_id
@@ -79,7 +80,7 @@ class Executor():
                 universal_newlines=True)
 
     def _run_image(self, image, cmd=''):
-        script = "docker run -v /repos --volumes-from shipbuilder-controller -i %s %s" % (image, cmd)
+        script = "docker run -v \"%s\":/repos -i %s %s" % (self.host_repo_path, image, cmd)
         print(script)
         return subprocess.Popen(
                 script,
