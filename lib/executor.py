@@ -1,69 +1,120 @@
 import os
 import subprocess
-import yaml
+import shutil
 
 
-def find_config(directory):
-    for name in [".ship.yml", ".travis.yml"]:
-        if os.path.exists(os.path.join(directory, name)):
-            return os.path.join(directory, name)
+class Executor():
+    # uniquely identifies each built image during this session
+    global_id = 1
 
+    def __init__(self, repo_dir, config):
+        self.repo_dir = repo_dir
+        self.config = config
+        self.build_id = self.global_id
+        self.global_id += 1
 
-def parse_shipconfig(path):
-    with open(path, 'r') as f:
-        return yaml.safe_load(f)
+    def label(self):
+        return "build" + str(self.build_id)
 
+    def run(self):
+        success = True
 
-def run(config):
-    success = True
+        self.image = self._toolchain_container()
+        self.container = self.image
 
-    step_order = ['before_install', 'install', 'before_script', 'script']
-    for name in step_order:
-        success = execute_step(config, name)
-        if not success:
-            break
+        step_order = ['before_install', 'install', 'before_script', 'script']
+        for name in step_order:
+            success = self.execute_step(name)
+            if not success:
+                break
 
-    if success:
-        execute_step(config, 'after_success')
-    else:
-        execute_step(config, 'after_failure')
-
-    execute_step(config, 'after_script')
-
-    return success
-
-
-def execute_step(config, name):
-    if name in config:
-        print("executing step %s" % name)
-
-        env = os.environ.copy()
-        env.update(EXTRA_ENV)
-
-        if isinstance(config[name], str):
-            commands = [config[name]]
+        if success:
+            self.execute_step('after_success')
         else:
-            commands = config[name]
+            self.execute_step('after_failure')
 
-        returncode = subprocess.call(
-            ['/bin/bash', '-x', '-e', '-c', '; '.join(commands)],
-            env=env)
-        if returncode != 0:
-            print("failed during '%s' step" % name)
-            return False
+        self.execute_step('after_script')
 
-    return True
+        return success
+
+    def execute_step(self, name):
+
+        if name in self.config:
+            print("executing step %s" % name)
+
+            env = os.environ.copy()
+            env.update(self.EXTRA_ENV)
+
+            if isinstance(self.config[name], str):
+                commands = [self.config[name]]
+            else:
+                commands = self.config[name]
+
+            script = ["set -e -x", 'cd "%s"' % self.repo_dir] + commands
+
+            sh = self._run_image(self.image)
+            sh.stdin.write(";\n".join(script))
+
+            sh.stdin.close()
+            sh.wait()
+
+            if sh.returncode != 0:
+                print("failed during '%s' step" % name)
+                return False
+            else:
+                try:
+                    self._commit_container(name)
+                except Error:
+                    print("failed to commit %s on step %s" % (self.container, name))
+                    return False
+
+        return True
+
+    def _docker(self, command):
+        print("docker " + command)
+        return subprocess.Popen("docker " + command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                shell=True,
+                universal_newlines=True)
+
+    def _run_image(self, image, cmd=''):
+        script = "docker run -v /repos --volumes-from shipbuilder-controller -i %s %s" % (image, cmd)
+        print(script)
+        return subprocess.Popen(
+                script,
+                stdin=subprocess.PIPE,
+                shell=True,
+                universal_newlines=True)
+
+    def _commit_container(self, name):
+        ps = self._docker("ps -lq")
+        ps.wait()
+        self.container = ps.stdout.read().strip()
+
+        new_image =  "%s-%s" % (self.label(), name)
+        self.image = new_image
+        commit = self._docker("commit %s %s" % (self.container, new_image))
+        commit.wait()
+        if commit.returncode != 0:
+            raise Error(commit.stdout)
+
+    def _toolchain_container(self):
+        if 'language' in self.config:
+            return 'shipbuilder-language-' + self.config['language']
+
+        return "shipbuilder-base"
 
 
-EXTRA_ENV = {
-    'CI': 'true',
-    'TRAVIS': 'true',
-    'CONTINUOUS_INTEGRATION': 'true',
-    'DEBIAN_FRONTEND': 'noninteractive',
-    'LANG': 'en_US.UTF-8',
-    'LC_ALL': 'en_US.UTF-8',
-    'RAILS_ENV': 'test',
-    'RACK_ENV': 'test',
-    'MERB_ENV': 'test',
-    'JRUBY_OPTS': '--server -Dcext.enabled=false -Xcompile.invokedynamic=false'
-}
+    EXTRA_ENV = {
+        'CI': 'true',
+        'TRAVIS': 'true',
+        'CONTINUOUS_INTEGRATION': 'true',
+        'DEBIAN_FRONTEND': 'noninteractive',
+        'LANG': 'en_US.UTF-8',
+        'LC_ALL': 'en_US.UTF-8',
+        'RAILS_ENV': 'test',
+        'RACK_ENV': 'test',
+        'MERB_ENV': 'test',
+        'JRUBY_OPTS': '--server -Dcext.enabled=false -Xcompile.invokedynamic=false'
+    }

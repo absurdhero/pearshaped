@@ -1,23 +1,22 @@
 #!/usr/bin/python3
 
-# checks out a git repo to a local directory if it doesn't exist
-# if it does exist, it pulls it.
-
-# executes .ship.yml or .travis.yml (in that order)
-
-# reports build results on stdout
+# Checks out a git repo to a local directory if it doesn't exist.
+# If it does exist, it pulls it.
+# Builds a docker image based on the chose toolchain in the project's config.
+# Mounts the repo in the container and invokes the builder.
+# The builder executes the scripts in .ship.yml or .travis.yml (in that order).
+# Reports build results on stdout.
 
 import os
 
-from lib import repo, executor
+from lib import configure, executor, repo
 
 repo_dir = repo.sync()
 
-config = executor.parse_shipconfig(executor.find_config(repo_dir))
+config = configure.parse(configure.find(repo_dir))
 
-os.chdir(repo_dir)
-
-success = executor.run(config)
+exec = executor.Executor(repo_dir, config)
+success = exec.run()
 
 if not success:
     exit(1)

@@ -2,7 +2,7 @@ import subprocess
 import os
 
 
-repo_dir = "repo"
+repo_dir = "/repos/repo"
 
 
 def git(cmd):
