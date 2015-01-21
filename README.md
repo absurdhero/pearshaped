@@ -12,7 +12,7 @@ not.
 
 Running inside docker:
 
-    REPO_URL=https://github.com/my/repo" ./run.sh
+    REPO_URL=https://github.com/my/repo" bin/run
 
 Running outside of docker:
 
@@ -20,13 +20,13 @@ Running outside of docker:
 
 Building the base docker image and each language image:
 
-    ./build_images.sh
+    bin/build_images
 
 Build a single language image:
 
-    ./build_images.sh language/python
+    bin/build_images language/python
 
 Build the base image:
 
-    ./build_images.sh base
+    bin/build_images base
 
