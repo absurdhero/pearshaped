@@ -11,4 +11,4 @@ def find(directory):
 
 def parse(path):
     with open(path, 'r') as f:
-        return yaml.safe_load(f)
+        return yaml.load(f, Loader=yaml.BaseLoader)

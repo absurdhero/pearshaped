@@ -3,6 +3,9 @@ import subprocess
 import shutil
 
 
+def out(msg):
+    print(msg, flush=True)
+
 class Executor():
     # uniquely identifies each built image during this session
     global_id = 1
@@ -41,17 +44,14 @@ class Executor():
     def execute_step(self, name):
 
         if name in self.config:
-            print("executing step %s" % name)
+            out("executing step %s" % name)
 
             env = os.environ.copy()
             env.update(self.EXTRA_ENV)
 
-            if isinstance(self.config[name], str):
-                commands = [self.config[name]]
-            else:
-                commands = self.config[name]
+            commands = self._config_as_list(name)
 
-            script = ["set -e -x", 'cd "%s"' % self.repo_dir] + commands
+            script = self._script_preamble() + self._with_echo(commands)
 
             sh = self._run_image(self.image)
             sh.stdin.write(";\n".join(script))
@@ -60,19 +60,54 @@ class Executor():
             sh.wait()
 
             if sh.returncode != 0:
-                print("failed during '%s' step" % name)
+                out("failed during '%s' step" % name)
                 return False
             else:
                 try:
                     self._commit_container(name)
                 except Error:
-                    print("failed to commit %s on step %s" % (self.container, name))
+                    out("failed to commit %s on step %s" % (self.container, name))
                     return False
 
         return True
 
+    def _script_preamble(self):
+        preamble = [
+                '. /etc/profile.d/rvm.sh',
+                'set -e'
+                ]
+
+        if 'rvm' in self.config:
+            chosen_rvm =  self._config_as_list('rvm')[0]
+            preamble += [
+                    'rvm install ' + chosen_rvm,
+                    'echo rvm use ' + chosen_rvm,
+                    'rvm use ' + chosen_rvm,
+                    'gem install bundler rake',
+                    ]
+
+        preamble.append('cd "%s"' % self.repo_dir)
+
+        return preamble
+
+    def _with_echo(self, cmd_list):
+        cmds = []
+
+        for cmd in cmd_list:
+            cmds.append('echo ' + cmd)
+            cmds.append(cmd)
+
+        return cmds
+
+    def _config_as_list(self, key):
+        if isinstance(self.config[key], str):
+            return [self.config[key]]
+        else:
+            return self.config[key]
+
+
     def _docker(self, command):
-        print("docker " + command)
+        out("docker " + command, flush=True)
         return subprocess.Popen("docker " + command,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -81,7 +116,7 @@ class Executor():
 
     def _run_image(self, image, cmd=''):
         script = "docker run -v \"%s\":/repos -i %s %s" % (self.host_repo_path, image, cmd)
-        print(script)
+        out(script)
         return subprocess.Popen(
                 script,
                 stdin=subprocess.PIPE,
@@ -112,7 +147,7 @@ class Executor():
             if len(images_output) > 0:
                 return label
             else:
-                print("warning: language %s not found. using base image" % language)
+                out("warning: language %s not found. using base image" % language)
 
         return "shipbuilder-base"
 
