@@ -86,32 +86,32 @@ class Executor():
         return success
 
     def execute_step(self, name):
+        if name not in self.config:
+            return True
 
-        if name in self.config:
-            out("executing step %s" % name)
+        out("executing step %s" % name)
 
-            env = os.environ.copy()
-            env.update(self.EXTRA_ENV)
+        env_flags = " ".join(["-e \"{}={}\"".format(key, value) for key,value in self.EXTRA_ENV.items()])
+        print(env_flags)
+        commands = self._config_as_list(name)
 
-            commands = self._config_as_list(name)
+        script = self._script_preamble() + self._with_echo(commands)
 
-            script = self._script_preamble() + self._with_echo(commands)
+        proc = self.docker.run_image(flags='-v \"{}\":/repos {}'.format(self.host_repo_path, env_flags))
+        proc.stdin.write(";\n".join(script))
 
-            proc = self.docker.run_image(flags='-v \"%s\":/repos' % self.host_repo_path)
-            proc.stdin.write(";\n".join(script))
+        proc.stdin.close()
+        proc.wait()
 
-            proc.stdin.close()
-            proc.wait()
-
-            if proc.returncode != 0:
-                out("failed during '%s' step" % name)
+        if proc.returncode != 0:
+            out("failed during '%s' step" % name)
+            return False
+        else:
+            try:
+                self.docker.commit_current_to("%s-%s" % (self.label(), name))
+            except RuntimeError:
+                out("failed to commit %s on step %s" % (self.docker.container, name))
                 return False
-            else:
-                try:
-                    self.docker.commit_current_to("%s-%s" % (self.label(), name))
-                except RuntimeError:
-                    out("failed to commit %s on step %s" % (self.docker.container, name))
-                    return False
 
         return True
 
@@ -171,7 +171,6 @@ class Executor():
         'CONTINUOUS_INTEGRATION': 'true',
         'DEBIAN_FRONTEND': 'noninteractive',
         'LANG': 'en_US.UTF-8',
-        'LC_ALL': 'en_US.UTF-8',
         'RAILS_ENV': 'test',
         'RACK_ENV': 'test',
         'MERB_ENV': 'test',
