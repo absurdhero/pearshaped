@@ -11,7 +11,7 @@ import os
 
 from lib import configure, executor, repo
 
-repo_dir = repo.sync()
+repo_dir = repo.sync('/repos/', os.getenv("REPO_URL"))
 
 config = configure.parse(configure.find(repo_dir))
 
