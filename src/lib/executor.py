@@ -2,9 +2,52 @@ import os
 import subprocess
 import shutil
 
+__all__ = ["Executor"]
 
 def out(msg):
     print(msg, flush=True)
+
+class Docker():
+    def __init__(self):
+        pass
+
+    def set_image(self, image):
+        self.image = image
+
+    def exec(self, command):
+        out("docker " + command)
+        return subprocess.Popen("docker " + command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                shell=True,
+                universal_newlines=True)
+
+    def check_output(self, command):
+        return subprocess.check_output('docker ' + command,
+                shell=True,
+                universal_newlines=True)
+
+    def run_image(self, cmd='', flags=''):
+        script = "docker run %s -i %s %s" % (flags, self.image, cmd)
+        out(script)
+        return subprocess.Popen(
+                script,
+                stdin=subprocess.PIPE,
+                shell=True,
+                universal_newlines=True)
+
+    def commit_current_to(self, new_image):
+        """ save the current/last running container to an image """
+        ps = self.exec("ps -lq")
+        ps.wait()
+        self.container = ps.stdout.read().strip()
+
+        commit = self.exec("commit %s %s" % (self.container, new_image))
+        commit.wait()
+        if commit.returncode != 0:
+            raise RuntimeError(commit.stdout)
+
+        self.image = new_image
 
 class Executor():
     # uniquely identifies each built image during this session
@@ -17,14 +60,15 @@ class Executor():
         self.build_id = self.global_id
         self.global_id += 1
 
+        self.docker = Docker()
+
     def label(self):
         return "build" + str(self.build_id)
 
     def run(self):
         success = True
 
-        self.image = self._toolchain_container()
-        self.container = self.image
+        self.docker.set_image(self._toolchain_container())
 
         step_order = ['before_install', 'install', 'before_script', 'script']
         for name in step_order:
@@ -53,20 +97,20 @@ class Executor():
 
             script = self._script_preamble() + self._with_echo(commands)
 
-            sh = self._run_image(self.image)
-            sh.stdin.write(";\n".join(script))
+            proc = self.docker.run_image(flags='-v \"%s\":/repos' % self.host_repo_path)
+            proc.stdin.write(";\n".join(script))
 
-            sh.stdin.close()
-            sh.wait()
+            proc.stdin.close()
+            proc.wait()
 
-            if sh.returncode != 0:
+            if proc.returncode != 0:
                 out("failed during '%s' step" % name)
                 return False
             else:
                 try:
-                    self._commit_container(name)
-                except Error:
-                    out("failed to commit %s on step %s" % (self.container, name))
+                    self.docker.commit_current_to("%s-%s" % (self.label(), name))
+                except RuntimeError:
+                    out("failed to commit %s on step %s" % (self.docker.container, name))
                     return False
 
         return True
@@ -106,43 +150,13 @@ class Executor():
             return self.config[key]
 
 
-    def _docker(self, command):
-        out("docker " + command, flush=True)
-        return subprocess.Popen("docker " + command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                shell=True,
-                universal_newlines=True)
-
-    def _run_image(self, image, cmd=''):
-        script = "docker run -v \"%s\":/repos -i %s %s" % (self.host_repo_path, image, cmd)
-        out(script)
-        return subprocess.Popen(
-                script,
-                stdin=subprocess.PIPE,
-                shell=True,
-                universal_newlines=True)
-
-    def _commit_container(self, name):
-        ps = self._docker("ps -lq")
-        ps.wait()
-        self.container = ps.stdout.read().strip()
-
-        new_image =  "%s-%s" % (self.label(), name)
-        self.image = new_image
-        commit = self._docker("commit %s %s" % (self.container, new_image))
-        commit.wait()
-        if commit.returncode != 0:
-            raise Error(commit.stdout)
 
     def _toolchain_container(self):
         if 'language' in self.config:
             language = self.config['language']
             label = 'shipbuilder-language-' + language
 
-            images_output = subprocess.check_output('docker images -q %s' % label,
-                    shell=True,
-                    universal_newlines=True)
+            images_output = self.docker.check_output('images -q %s' % label)
 
             if len(images_output) > 0:
                 return label
