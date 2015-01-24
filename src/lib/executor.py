@@ -66,26 +66,44 @@ class Executor():
         return "build" + str(self.build_id)
 
     def run(self):
-        success = True
+        status = self._build_sequence()
 
+        if status != 'success':
+            try:
+                name = "%s-%s" % (self.label(), status)
+                self.docker.commit_current_to(name)
+                out("saved failed state as image " + name)
+            except RuntimeError:
+                out("failed to commit %s on step %s" % (self.docker.container, name))
+
+            return False
+
+        return True
+
+    def _build_sequence(self):
         self.docker.set_image(self._toolchain_container())
 
-        step_order = ['before_install', 'install', 'before_script', 'script']
-        for name in step_order:
-            success = self.execute_step(name)
-            if not success:
-                break
+        pre_steps = ['before_install', 'install', 'before_script']
+        for name in pre_steps:
+            errored = not self._execute_step(name)
+            if errored:
+                return 'errored'
+
+        success = self._execute_step('script')
 
         if success:
-            self.execute_step('after_success')
+            self._execute_step('after_success')
         else:
-            self.execute_step('after_failure')
+            self._execute_step('after_failure')
 
-        self.execute_step('after_script')
+        self._execute_step('after_script')
 
-        return success
+        if success:
+            return 'success'
+        else:
+            return 'failure'
 
-    def execute_step(self, name):
+    def _execute_step(self, name):
         if name not in self.config:
             return True
 
@@ -106,12 +124,6 @@ class Executor():
         if proc.returncode != 0:
             out("failed during '%s' step" % name)
             return False
-        else:
-            try:
-                self.docker.commit_current_to("%s-%s" % (self.label(), name))
-            except RuntimeError:
-                out("failed to commit %s on step %s" % (self.docker.container, name))
-                return False
 
         return True
 
