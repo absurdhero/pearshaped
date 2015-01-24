@@ -72,7 +72,7 @@ class Executor():
         return "build" + str(self.build_id)
 
     def run(self):
-        self._fill_unwritten_steps()
+        ConfigGuesser(self.config, self.repo_dir).fill_unwritten_steps()
         status  = self._build_sequence()
 
         if status != 'success':
@@ -182,21 +182,6 @@ class Executor():
 
         return "shipbuilder-base"
 
-    def _fill_unwritten_steps(self):
-        bundle_install = 'bundle install --jobs=3 --retry=3'
-        if 'install' not in self.config:
-            if 'gemfile' in self.config:
-                   self.config['install'] = [bundle_install + ' --gemfile=' + self._config_as_list('gemfile')[0]]
-            elif os.path.exists(os.path.join(self.repo_dir, 'Gemfile.lock')):
-                   self.config['install'] = [bundle_install + ' --deployment']
-            elif os.path.exists(os.path.join(self.repo_dir, 'Gemfile')):
-                   self.config['install'] = [bundle_install]
-
-        if self.config.get('language', None) == 'ruby' and 'script' not in self.config:
-            if os.path.exists(os.path.join(self.repo_dir, 'Rakefile')):
-                   self.config['script'] = ['rake test']
-
-
     EXTRA_ENV = {
         'CI': 'true',
         'TRAVIS': 'true',
@@ -208,3 +193,38 @@ class Executor():
         'MERB_ENV': 'test',
         'JRUBY_OPTS': '--server -Dcext.enabled=false -Xcompile.invokedynamic=false'
     }
+
+
+class ConfigGuesser():
+    def __init__(self, config, repo_dir):
+        self.config = config
+        self.repo_dir = repo_dir
+
+    def fill_unwritten_steps(self):
+        if self.is_language('ruby'):
+            bundle_install = 'bundle install --jobs=3 --retry=3'
+            if 'install' not in self.config:
+                if 'gemfile' in self.config:
+                       self.config['install'] = [bundle_install + ' --gemfile=' + self._config_as_list('gemfile')[0]]
+                elif os.path.exists(os.path.join(self.repo_dir, 'Gemfile.lock')):
+                       self.config['install'] = [bundle_install + ' --deployment']
+                elif os.path.exists(os.path.join(self.repo_dir, 'Gemfile')):
+                       self.config['install'] = [bundle_install]
+
+            if 'script' not in self.config:
+                if os.path.exists(os.path.join(self.repo_dir, 'Rakefile')):
+                       self.config['script'] = ['rake test']
+
+        elif self.is_language('node_js'):
+            if 'install' not in self.config:
+                self.config['install'] = ['npm install']
+
+            if 'script' not in self.config:
+                self.config['script'] = ['npm test']
+
+        elif self.is_language('python') or self.is_language('python3'):
+            if 'install' not in self.config and os.path.exists(os.path.join(self.repo_dir, 'requirements.txt')):
+                self.config['install'] = ['pip install -r requirements.txt']
+
+    def is_language(self, lang):
+       return self.config.get('language', None) == lang
