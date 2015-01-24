@@ -8,8 +8,9 @@ def out(msg):
     print(msg, flush=True)
 
 class Docker():
+
     def __init__(self):
-        pass
+        self.committed = []
 
     def set_image(self, image):
         self.image = image
@@ -47,7 +48,12 @@ class Docker():
         if commit.returncode != 0:
             raise RuntimeError(commit.stdout)
 
+        self.committed.append(new_image)
         self.image = new_image
+
+    def remove_all_committed(self):
+        for image in self.committed:
+            subprocess.check_call(['docker', 'rmi', '-f', image])
 
 class Executor():
     # uniquely identifies each built image during this session
@@ -70,9 +76,7 @@ class Executor():
 
         if status != 'success':
             try:
-                name = "%s-%s" % (self.label(), status)
-                self.docker.commit_current_to(name)
-                out("saved failed state as image " + name)
+                self.docker.commit_current_to("%s-%s" % (self.label(), name))
             except RuntimeError:
                 out("failed to commit %s on step %s" % (self.docker.container, name))
 
@@ -99,6 +103,7 @@ class Executor():
         self._execute_step('after_script')
 
         if success:
+            self.docker.remove_all_committed()
             return 'success'
         else:
             return 'failure'
@@ -124,6 +129,12 @@ class Executor():
         if proc.returncode != 0:
             out("failed during '%s' step" % name)
             return False
+        else:
+            try:
+                self.docker.commit_current_to("%s-%s" % (self.label(), name))
+            except RuntimeError:
+                out("failed to commit %s on step %s" % (self.docker.container, name))
+                return False
 
         return True
 
