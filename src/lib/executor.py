@@ -72,14 +72,10 @@ class Executor():
         return "build" + str(self.build_id)
 
     def run(self):
-        status = self._build_sequence()
+        self._fill_unwritten_steps()
+        status  = self._build_sequence()
 
         if status != 'success':
-            try:
-                self.docker.commit_current_to("%s-%s" % (self.label(), name))
-            except RuntimeError:
-                out("failed to commit %s on step %s" % (self.docker.container, name))
-
             return False
 
         return True
@@ -172,8 +168,6 @@ class Executor():
         else:
             return self.config[key]
 
-
-
     def _toolchain_container(self):
         if 'language' in self.config:
             language = self.config['language']
@@ -187,6 +181,21 @@ class Executor():
                 out("warning: language %s not found. using base image" % language)
 
         return "shipbuilder-base"
+
+    def _fill_unwritten_steps(self):
+        bundle_install = 'bundle install --jobs=3 --retry=3'
+        if 'install' not in self.config:
+            if 'gemfile' in self.config:
+                   self.config['install'] = [bundle_install + ' --gemfile=' + self._config_as_list('gemfile')[0]]
+            elif os.path.exists(os.path.join(self.repo_dir, 'Gemfile.lock')):
+                   self.config['install'] = [bundle_install + ' --deployment']
+            elif os.path.exists(os.path.join(self.repo_dir, 'Gemfile')):
+                   self.config['install'] = [bundle_install]
+
+        if self.config.get('language', None) == 'ruby' and 'script' not in self.config:
+            if os.path.exists(os.path.join(self.repo_dir, 'Rakefile')):
+                   self.config['script'] = ['rake test']
+
 
     EXTRA_ENV = {
         'CI': 'true',
