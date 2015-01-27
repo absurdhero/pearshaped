@@ -8,7 +8,9 @@ fi
 
 mkdir -p $PEARSHAPED_HOME/projects
 
-(cd src; docker build -q -t orchard --force-rm=true .)
+if [ "$BUILD" = true ]; then
+    ( cd src; docker build -q -t orchard --force-rm=true .)
+fi
 
-docker rm orchard-controller 2> /dev/null || true
+docker rm orchard-controller &> /dev/null || true
 docker run --name orchard-controller -e PEARSHAPED_HOME="$PEARSHAPED_HOME" -v "$PEARSHAPED_HOME":/build -v /var/run/docker.sock:/var/run/docker.sock -e "REPO_URL=${REPO_URL}" orchard
