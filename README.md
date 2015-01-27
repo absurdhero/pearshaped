@@ -53,7 +53,7 @@ projects:
     foo:
         repo: https://github.com/foo/foo
 
-'''
+```
 
 file layout:
 ```
