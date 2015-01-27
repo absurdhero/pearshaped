@@ -9,15 +9,26 @@ In simple cases, pearshaped acts as a drop-in replacement for Travis CI.
 It will read either its own `.pearshaped.yml` config file or `.travis.yml`.
 Ease of migration to/from Travis is a goal but 100% compatibility is not.
 
-Running inside docker:
+For Those Short on Time
+-----------------------
 
-    bin/run
+After checking out this git repo here's how to build this project and
+then run it on your repo that already has a pearshaped or travis config:
 
-Running outside of docker:
+    mkdir ~/.pearshaped
+    echo 'projects: {test: {repo: "https://github.com/my/repo"}}' > ~/.pearshaped/config.yml
+    bin/build_images
+    build=true bin/run
 
-    REPO_URL="https://github.com/my/repo" PEARSHAPED_HOME=~/.pearshaped python3 ./main.py
 
-Building the base docker image and each language image:
+Commands
+--------
+
+Build docker image and run inside docker:
+
+    build=true bin/run
+
+Building the base docker image and all language images:
 
     bin/build_images
 
