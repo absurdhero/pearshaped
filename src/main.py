@@ -8,16 +8,27 @@
 # Reports build results on stdout.
 
 import os
+import sys
 
-from lib import configure, executor, repo
+from lib import configure, executor, repo, projects
 
-repo_dir = repo.sync('/build/projects', os.getenv("REPO_URL"))
-
-config = configure.parse(configure.find(repo_dir))
 
 home_path = os.getenv('PEARSHAPED_HOME')
-exec = executor.Executor(home_path, repo_dir, config)
-success = exec.run()
 
-if not success:
-    exit(1)
+if not os.path.exists('/build/config.yml'):
+    print("config.yml missing in PEARSHAPED_HOME [%s]" % home_path, file=sys.stderr)
+    exit(127)
+
+for project in projects.each('/build'):
+    print("executing " + project.name)
+
+
+    repo_dir = repo.sync('/build/projects', project.repo_url)
+
+    config = configure.parse(configure.find(repo_dir))
+
+    exec = executor.Executor(home_path, repo_dir, config)
+    success = exec.run()
+
+    if not success:
+        exit(1)

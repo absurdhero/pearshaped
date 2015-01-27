@@ -11,7 +11,7 @@ Ease of migration to/from Travis is a goal but 100% compatibility is not.
 
 Running inside docker:
 
-    REPO_URL=https://github.com/my/repo" bin/run
+    bin/run
 
 Running outside of docker:
 
@@ -29,6 +29,28 @@ Build the base image:
 
     bin/build_images base
 
+Configuration
+-------------
+
+Add projects to pearshaped by editing `config.yml` under PEARSHAPED_HOME (`.pearshaped` by default)
+
+`config.yml` are formatted like the following with one or more projects:
+
+```yaml
+
+projects:
+    foo:
+        repo: https://github.com/foo/foo
+
+'''
+
+file layout:
+```
+$PEARSHAPED_HOME
+├── projects
+│   └── foo
+└── config.yml
+```
 
 Toolchain Support
 -----------------
@@ -62,9 +84,3 @@ python3:
 
     apt-get install -qy python3 python3-dev
     pip3 install nose pytest mock wheel
-
-
-Configuration
--------------
-
-Add projects to pearshaped by editing projects.yml under PEARSHAPED_HOME (`.pearshaped` by default)
