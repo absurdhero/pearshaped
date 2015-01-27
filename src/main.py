@@ -11,12 +11,12 @@ import os
 
 from lib import configure, executor, repo
 
-repo_dir = repo.sync('/build/', os.getenv("REPO_URL"))
+repo_dir = repo.sync('/build/projects', os.getenv("REPO_URL"))
 
 config = configure.parse(configure.find(repo_dir))
 
 home_path = os.getenv('PEARSHAPED_HOME')
-exec = executor.Executor(os.path.join(home_path, 'projects'), repo_dir, config)
+exec = executor.Executor(home_path, repo_dir, config)
 success = exec.run()
 
 if not success:
