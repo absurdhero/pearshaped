@@ -116,7 +116,7 @@ class Executor():
 
         script = self._script_preamble() + self._with_echo(commands)
 
-        proc = self.docker.run_image(flags='-v \"{}\":/repos {}'.format(self.host_repo_path, env_flags))
+        proc = self.docker.run_image(flags='-v \"{}\":/build {}'.format(self.host_repo_path, env_flags))
         proc.stdin.write(";\n".join(script))
 
         proc.stdin.close()
@@ -171,7 +171,7 @@ class Executor():
     def _toolchain_container(self):
         if 'language' in self.config:
             language = self.config['language']
-            label = 'shipbuilder-language-' + language
+            label = 'orchard-language-' + language
 
             images_output = self.docker.check_output('images -q %s' % label)
 
@@ -180,7 +180,7 @@ class Executor():
             else:
                 out("warning: language %s not found. using base image" % language)
 
-        return "shipbuilder-base"
+        return "orchard-base"
 
     EXTRA_ENV = {
         'CI': 'true',

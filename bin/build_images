@@ -14,7 +14,7 @@ for d in `find $search -type d`; do
     if [[ -e ./$d/Dockerfile ]] ; then
         tag=`echo $d | tr / -`
         echo "building $tag"
-        (cd $d; docker build -t "shipbuilder-$tag" --force-rm=true .)
+        (cd $d; docker build -t "orchard-$tag" --force-rm=true .)
     fi
 done
 

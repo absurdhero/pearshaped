@@ -1,4 +1,4 @@
-FROM shipbuilder-language-python3
+FROM orchard-language-python3
 MAINTAINER absurdhero
 
 RUN apt-get install -qy docker.io git

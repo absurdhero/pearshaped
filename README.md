@@ -1,14 +1,13 @@
-shipdock
-========
+pearshaped
+==========
 
 A docker-based build framework and continuous-integration system which runs
 builds in isolated containers, saving the state after each step.
-shipdock also runs inside a container.
+Pearshaped itself runs inside a container for easy deployment.
 
-In simple cases, shipbuilder acts as a drop-in replacement for Travis CI.
-It will read either its own `.ship.yml` config file or `.travis.yml`.
-Ease of migration from Travis is a goal but 100% compatibility is currently
-not.
+In simple cases, pearshaped acts as a drop-in replacement for Travis CI.
+It will read either its own `.pearshaped.yml` config file or `.travis.yml`.
+Ease of migration to/from Travis is a goal but 100% compatibility is not.
 
 Running inside docker:
 
@@ -16,7 +15,7 @@ Running inside docker:
 
 Running outside of docker:
 
-    REPO_URL="https://github.com/my/repo" REPO_DIR=~/.shipbuilder/repos python3 ./main.py
+    REPO_URL="https://github.com/my/repo" PEARSHAPED_HOME=~/.pearshaped python3 ./main.py
 
 Building the base docker image and each language image:
 
@@ -34,9 +33,9 @@ Build the base image:
 Toolchain Support
 -----------------
 
-shipdock ships with support for several popular toolchains and versions.
+pearshaped ships with support for several popular toolchains and versions.
 Currently, the base VM is Ubuntu 14.04 with autotools, gcc, clang, go,
-nodejs, and npm installed for use by all configurations.
+nodejs, and npm, and rvm installed for use by all configurations.
 
 In addition, setting the 'language' property in the ship config to one
 of the following performs additional actions:
@@ -63,3 +62,9 @@ python3:
 
     apt-get install -qy python3 python3-dev
     pip3 install nose pytest mock wheel
+
+
+Configuration
+-------------
+
+Add projects to pearshaped by editing projects.yml under PEARSHAPED_HOME (`.pearshaped` by default)

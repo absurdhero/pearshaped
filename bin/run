@@ -1,12 +1,14 @@
 #!/bin/sh
 
-set -e -x
+set -e
 
-if [ ! $REPO_DIR ]; then
-    REPO_DIR=$HOME/.shipbuilder/repos
+if [ ! $PEARSHAPED_HOME ]; then
+    PEARSHAPED_HOME=$HOME/.pearshaped
 fi
 
-(cd src; docker build -q -t shipbuilder --force-rm=true .)
+mkdir -p $PEARSHAPED_HOME/projects
 
-docker rm shipbuilder-controller 2> /dev/null || true
-docker run --name shipbuilder-controller -e REPO_DIR="$REPO_DIR" -v "$REPO_DIR":/repos -v /var/run/docker.sock:/var/run/docker.sock -e "REPO_URL=${REPO_URL}" shipbuilder
+(cd src; docker build -q -t orchard --force-rm=true .)
+
+docker rm orchard-controller 2> /dev/null || true
+docker run --name orchard-controller -e PEARSHAPED_HOME="$PEARSHAPED_HOME" -v "$PEARSHAPED_HOME":/build -v /var/run/docker.sock:/var/run/docker.sock -e "REPO_URL=${REPO_URL}" orchard
