@@ -8,7 +8,7 @@ fi
 
 mkdir -p $PEARSHAPED_HOME/projects
 
-if [ "$BUILD" = true ]; then
+if [ "$build" = true ]; then
     ( cd src; docker build -q -t orchard --force-rm=true .)
 fi
 

@@ -22,8 +22,7 @@ if not os.path.exists('/build/config.yml'):
 for project in projects.each('/build'):
     print("executing " + project.name)
 
-
-    repo_dir = repo.sync('/build/projects', project.repo_url)
+    repo_dir = repo.sync(os.path.join('/build/projects', project.name), project.repo_url)
 
     config = configure.parse(configure.find(repo_dir))
 

@@ -59,9 +59,10 @@ class Executor():
     # uniquely identifies each built image during this session
     global_id = 1
 
-    def __init__(self, host_repo_path, repo_dir, config):
+    def __init__(self, host_repo_path, project_dir, config):
         self.host_repo_path = host_repo_path
-        self.repo_dir = repo_dir
+        self.project_dir = project_dir
+        self.repo_dir = os.path.join(project_dir, 'repo')
         self.config = config
         self.build_id = self.global_id
         self.global_id += 1

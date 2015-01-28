@@ -11,10 +11,7 @@ def sync(repo_base, url):
     if url is None or len(url) == 0:
         raise RuntimeError("repository url is empty")
 
-    # get the final directory and strip .git off the end
-    dirname = os.path.splitext(url.split('/')[-1])[0]
-
-    local_path = os.path.join(repo_base, dirname);
+    local_path = os.path.join(repo_base, 'repo')
 
     if os.path.exists(local_path):
         git("-C %s pull" % local_path)
