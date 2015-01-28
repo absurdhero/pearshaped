@@ -12,22 +12,27 @@ import sys
 
 from lib import configure, executor, repo, projects
 
-
 home_path = os.getenv('PEARSHAPED_HOME')
 
-if not os.path.exists('/build/config.yml'):
-    print("config.yml missing in PEARSHAPED_HOME [%s]" % home_path, file=sys.stderr)
-    exit(127)
 
-for project in projects.each('/build'):
-    print("executing " + project.name)
+def build_all():
+    if not os.path.exists('/build/config.yml'):
+        print("config.yml missing in PEARSHAPED_HOME [%s]" % home_path, file=sys.stderr)
+        exit(127)
 
-    repo_dir = repo.sync(os.path.join('/build/projects', project.name), project.repo_url)
+    for project in projects.each('/build'):
+        print("executing " + project.name)
 
-    config = configure.parse(configure.find(repo_dir))
+        project_dir = os.path.join('/build/projects', project.name)
+        repo_dir = repo.sync(project_dir, project.repo_url)
 
-    exec = executor.Executor(home_path, repo_dir, config)
-    success = exec.run()
+        config = configure.parse(configure.find(repo_dir))
 
-    if not success:
-        exit(1)
+        exec = executor.Executor(home_path, project_dir, config)
+        success = exec.run()
+
+        if not success:
+            exit(1)
+
+if __name__ == "__main__":
+    build_all()
