@@ -1,6 +1,8 @@
 import os
 import subprocess
-import shutil
+import sys
+
+from lib import multiplex
 
 __all__ = ["Executor"]
 
@@ -34,6 +36,8 @@ class Docker():
         return subprocess.Popen(
                 script,
                 stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 shell=True,
                 universal_newlines=True)
 
@@ -55,22 +59,20 @@ class Docker():
         for image in self.committed:
             subprocess.check_call(['docker', 'rmi', '-f', image])
 
-class Executor():
-    # uniquely identifies each built image during this session
-    global_id = 1
 
-    def __init__(self, host_repo_path, project_dir, config):
+class Executor():
+    def __init__(self, host_repo_path, project_dir, build_dir, build_id, config):
         self.host_repo_path = host_repo_path
+        self.build_dir = build_dir
         self.project_dir = project_dir
+        self.build_id = build_id
         self.repo_dir = os.path.join(project_dir, 'repo')
         self.config = config
-        self.build_id = self.global_id
-        self.global_id += 1
 
         self.docker = Docker()
 
     def label(self):
-        return "build" + str(self.build_id)
+        return "build-" + str(self.build_id)
 
     def run(self):
         ConfigGuesser(self.config, self.repo_dir).fill_unwritten_steps()
@@ -121,17 +123,23 @@ class Executor():
         proc.stdin.write(";\n".join(script))
 
         proc.stdin.close()
-        proc.wait()
 
-        if proc.returncode != 0:
-            out("failed during '%s' step" % name)
-            return False
-        else:
-            try:
-                self.docker.commit_current_to("%s-%s" % (self.label(), name))
-            except RuntimeError:
-                out("failed to commit %s on step %s" % (self.docker.container, name))
+        with open(os.path.join(self.build_dir, 'log.txt'), 'a') as log:
+            output = multiplex.Multiplexer([proc.stdout], [sys.stdout, log])
+
+            output.run()
+            proc.wait()
+
+            if proc.returncode != 0:
+                output.write("step '%s' failed\n" % name)
                 return False
+            else:
+                output.write("step '%s' passed\n" % name)
+                try:
+                    self.docker.commit_current_to("%s-%s" % (self.label(), name))
+                except RuntimeError:
+                    out("failed to commit %s on step %s" % (self.docker.container, name))
+                    return False
 
         return True
 

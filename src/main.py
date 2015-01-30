@@ -24,11 +24,35 @@ def build_all():
         print("executing " + project.name)
 
         project_dir = os.path.join('/build/projects', project.name)
+
+        try:
+            os.makedirs(os.path.join(project_dir, 'builds'))
+        except FileExistsError:
+            pass
+
+        build_id = "0"
+        with open(os.path.join(project_dir, 'build_id'), 'a+') as id_file:
+            id_file.seek(0)
+            line = id_file.readline()
+
+            if len(line) != 0:
+                build_id = line.strip()
+                id_file.seek(0)
+                id_file.truncate(0)
+
+            id_file.write(str(int(build_id) + 1))
+
+        try:
+            build_dir = os.path.join(project_dir, 'builds', build_id)
+            os.mkdir(build_dir)
+        except FileExistsError:
+            pass
+
         repo_dir = repo.sync(project_dir, project.repo_url)
 
         config = configure.parse(configure.find(repo_dir))
 
-        exec = executor.Executor(home_path, project_dir, config)
+        exec = executor.Executor(home_path, project_dir, build_dir, build_id, config)
         success = exec.run()
 
         if not success:
