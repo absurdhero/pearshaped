@@ -1,87 +1,40 @@
+import json
 import os
-import subprocess
 import sys
+import time
 
-from lib import multiplex
+from lib import docker, multiplex
 
 __all__ = ["Executor"]
 
 def out(msg):
     print(msg, flush=True)
 
-class Docker():
-
-    def __init__(self):
-        self.committed = []
-
-    def set_image(self, image):
-        self.image = image
-
-    def exec(self, command):
-        out("docker " + command)
-        return subprocess.Popen("docker " + command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                shell=True,
-                universal_newlines=True)
-
-    def check_output(self, command):
-        return subprocess.check_output('docker ' + command,
-                shell=True,
-                universal_newlines=True)
-
-    def run_image(self, cmd='', flags=''):
-        script = "docker run %s -i %s %s" % (flags, self.image, cmd)
-        out(script)
-        return subprocess.Popen(
-                script,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                shell=True,
-                universal_newlines=True)
-
-    def commit_current_to(self, new_image):
-        """ save the current/last running container to an image """
-        ps = self.exec("ps -lq")
-        ps.wait()
-        self.container = ps.stdout.read().strip()
-
-        commit = self.exec("commit %s %s" % (self.container, new_image))
-        commit.wait()
-        if commit.returncode != 0:
-            raise RuntimeError(commit.stdout)
-
-        self.committed.append(new_image)
-        self.image = new_image
-
-    def remove_all_committed(self):
-        for image in self.committed:
-            subprocess.check_call(['docker', 'rmi', '-f', image])
-
 
 class Executor():
-    def __init__(self, host_repo_path, project_dir, build_dir, build_id, config):
-        self.host_repo_path = host_repo_path
-        self.build_dir = build_dir
-        self.project_dir = project_dir
-        self.build_id = build_id
-        self.repo_dir = os.path.join(project_dir, 'repo')
-        self.config = config
+    def __init__(self, build):
+        self.build = build
+        self.result = BuildResult(build.build_dir, build.build_id)
+        self.repo_dir = build.repo_dir
+        self.config = build.config
 
-        self.docker = Docker()
+        self.docker = docker.Docker()
 
     def label(self):
-        return "build-" + str(self.build_id)
+        return "build-" + str(self.build.build_id)
 
     def run(self):
+        self.result.setStartTime()
+        self.result.commit_id = self.build.commit_id()
         ConfigGuesser(self.config, self.repo_dir).fill_unwritten_steps()
-        status  = self._build_sequence()
+        status = self._build_sequence()
+        self.result.success = (status == 'success')
 
-        if status != 'success':
-            return False
+        self.result.setEndTime()
 
-        return True
+        self.result.serialize()
+
+        return self.result
 
     def _build_sequence(self):
         self.docker.set_image(self._toolchain_container())
@@ -119,16 +72,18 @@ class Executor():
 
         script = self._script_preamble() + self._with_echo(commands)
 
-        proc = self.docker.run_image(flags='-v \"{}\":/build {}'.format(self.host_repo_path, env_flags))
+        proc = self.docker.run_image(flags='-v \"{}\":/build {}'.format(self.build.host_repo_path, env_flags))
         proc.stdin.write(";\n".join(script))
 
         proc.stdin.close()
 
-        with open(os.path.join(self.build_dir, 'log.txt'), 'a') as log:
+        with open(os.path.join(self.build.build_dir, 'log.txt'), 'a') as log:
             output = multiplex.Multiplexer([proc.stdout], [sys.stdout, log])
 
             output.run()
             proc.wait()
+
+            self.result.recordStep(name)
 
             if proc.returncode != 0:
                 output.write("step '%s' failed\n" % name)
@@ -237,3 +192,28 @@ class ConfigGuesser():
 
     def is_language(self, lang):
        return self.config.get('language', None) == lang
+
+
+class BuildResult():
+    def __init__(self, build_dir, build_id):
+        self.build_dir = build_dir
+        self.build_id = build_id
+
+        self.success = True
+        self.start_time = None
+        self.end_time = None
+        self.step_sequence = {}
+        self.commit_id = None
+
+    def setStartTime(self):
+        self.start_time = time.time()
+
+    def setEndTime(self):
+        self.end_time = time.time()
+
+    def recordStep(self, step):
+        self.step_sequence[step] = time.time()
+
+    def serialize(self):
+        with open(os.path.join(self.build_dir, 'result.json'), 'w') as f:
+            json.dump(self.__dict__, f, indent=2)

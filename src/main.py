@@ -10,7 +10,7 @@
 import os
 import sys
 
-from lib import configure, executor, repo, projects
+from lib import configure, executor, repo, projects, build_info
 
 home_path = os.getenv('PEARSHAPED_HOME')
 
@@ -30,7 +30,7 @@ def build_all():
         except FileExistsError:
             pass
 
-        build_id = "0"
+        build_id = "1"
         with open(os.path.join(project_dir, 'build_id'), 'a+') as id_file:
             id_file.seek(0)
             line = id_file.readline()
@@ -42,20 +42,21 @@ def build_all():
 
             id_file.write(str(int(build_id) + 1))
 
+        repo_dir = repo.sync(project_dir, project.repo_url)
+        config = configure.parse(configure.find(repo_dir))
+
+        info = build_info.BuildInfo(home_path, project_dir, build_id, config)
+
         try:
-            build_dir = os.path.join(project_dir, 'builds', build_id)
-            os.mkdir(build_dir)
+            os.mkdir(info.build_dir)
         except FileExistsError:
             pass
 
-        repo_dir = repo.sync(project_dir, project.repo_url)
 
-        config = configure.parse(configure.find(repo_dir))
+        exec = executor.Executor(info)
+        status = exec.run()
 
-        exec = executor.Executor(home_path, project_dir, build_dir, build_id, config)
-        success = exec.run()
-
-        if not success:
+        if not status.success:
             exit(1)
 
 if __name__ == "__main__":
